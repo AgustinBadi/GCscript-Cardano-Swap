@@ -23,6 +23,23 @@ This application WILL NOT address:
 * Repricing — updating an existing swap's price via the `UpdateSwaps` redeemer.
 * Partial fill management — the protocol allows partial fills but this app does not guide how much of a swap to take.
 
+### Invariants
+
+Rules the application must never violate. Protocol invariants are enforced by the on-chain validator — violating them causes transaction rejection. Application invariants are enforced by this application.
+
+**Protocol invariants (enforced by the spending validator and beacon minting policy):**
+* Exactly 3 beacon tokens per swap UTxO, each with quantity = 1 (pair, offer, ask)
+* Price numerator and denominator must both be > 0
+* On execution: `offer_taken × price_numerator ≤ ask_given × price_denominator`
+* Only the offer asset may leave the swap UTxO during execution; only the ask asset (and ADA) may enter
+* The output datum must include `prev_input` set to the `TxOutRef` of the consumed swap input
+* `invalid-hereafter` must be set on every Execute transaction
+* Beacons are minted only when a swap is created and burned only when it is closed — they never circulate freely
+
+**Application invariants:**
+* Only one-way swap interactions are constructed — no two-way swap transactions
+* All transactions target Preprod testnet only
+
 ### Future Options
 
 * **Close/Cancel swap** — closing an existing limit order (burning beacons, reclaiming assets) is not in scope for this prototype but is a natural next operation to implement.
