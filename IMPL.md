@@ -41,7 +41,14 @@ Cancel an existing open limit order and reclaim assets.
 
 - **GCscript MCP server** — an MCP server wrapping GCscript tooling would close the development feedback loop: schema validation against the official JSON schema, GameChanger URL encoding (gzip + base64url), and script templates. Would allow Claude to validate and test GCscript inline during development without sending scripts to the wallet blindly. TypeScript + `@gamechanger-finance/gc` npm package is the natural implementation path.
 
+## Architecture Decisions
+
+- **Beacon names pre-computed externally**: ISL `sha256()` accepts UTF-8 strings, not raw bytes. The three beacon names require hashing raw byte arrays (including the ADA `0x00` substitution for the pair beacon). They must be computed outside GCscript and injected via `args`.
+- **Two validators, different parameterization**: `swap_script` has no parameters and is used as-is. `beacon_script` takes `dapp_hash` (the spending validator script hash) as a validator-level parameter, applied at runtime via GCscript `scriptParams`.
+- **Script CBORs already compiled**: `contracts/cardano-swaps/aiken/plutus.json` contains the compiled CBOR for both validators. No Aiken compilation step needed.
+
 ## Open Issues
 
 - **UTxO filtering**: confirm with GCscript developer whether filtering by asset pair can be done inside the query or must be handled externally between Query and Execute steps
-- **Script CBORs**: compile spending validator and beacon minting policy from cardano-swaps Aiken source before any transaction can be built
+- **`scriptHex` after `scriptParams`**: unconfirmed whether GCscript returns the *parameterized* CBOR in `scriptHex` after applying `scriptParams`. If it returns the original, the minting witness will carry the wrong script and validation will fail.
+- **ADA-as-offer edge case**: the datum encodes ADA's policy as empty bytes `""`, but GCscript asset specs use `"ada"`. A single `args.offerPolicyId` cannot serve both roles without ISL conditionals (which don't exist). Needs two separate args or a dedicated ADA-offer script variant.
