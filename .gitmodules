@@ -1,0 +1,3 @@
+[submodule "contracts/cardano-swaps"]
+	path = contracts/cardano-swaps
+	url = https://github.com/fallen-icarus/cardano-swaps

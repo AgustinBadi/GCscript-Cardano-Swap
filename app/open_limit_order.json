@@ -1,5 +1,8 @@
 {
+    "type": "script",
     "title": "Open Limit Order",
     "description": "Creates a one-way swap UTxO on the Cardano-Swaps protocol via GCscript.",
-    "type": "script"
+    "exportAs": "openLimitOrder",
+    "run": {
+    }
 }

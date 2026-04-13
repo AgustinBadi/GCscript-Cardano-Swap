@@ -239,6 +239,24 @@ GCscript is a JSON-based DSL for building and submitting Cardano transactions th
 
 Scripts are JSON objects where every node is a function call. The wallet parses, validates, executes, and presents the result to the user for approval.
 
+#### Scope & Exports
+
+Every `script` block has a **local cache** — a memory space where child function calls store their results during execution. The cache is isomorphic with the code structure by default.
+
+There is a single **global `exports` object** for the entire script. Only what is explicitly exported there is returned to the caller. Without `exportAs`, exports is always empty.
+
+To export a block's cache into the global exports, use `exportAs`:
+
+```json
+{
+    "type": "script",
+    "exportAs": "myResult",
+    "run": { ... }
+}
+```
+
+Child results are accessed from the cache via ISL: `get('cache.<key>')`.
+
 #### Script Structure
 
 ```json

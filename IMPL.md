@@ -37,6 +37,10 @@ Cancel an existing open limit order and reclaim assets.
 
 ---
 
+## Future Options
+
+- **GCscript MCP server** — an MCP server wrapping GCscript tooling would close the development feedback loop: schema validation against the official JSON schema, GameChanger URL encoding (gzip + base64url), and script templates. Would allow Claude to validate and test GCscript inline during development without sending scripts to the wallet blindly. TypeScript + `@gamechanger-finance/gc` npm package is the natural implementation path.
+
 ## Open Issues
 
 - **UTxO filtering**: confirm with GCscript developer whether filtering by asset pair can be done inside the query or must be handled externally between Query and Execute steps
