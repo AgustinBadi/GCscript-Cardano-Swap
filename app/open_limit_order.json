@@ -40,8 +40,125 @@
                 },
                 "stakingKey": {
                     "type": "getStakingPublicKey"
+                },
+                "dappAddress": {
+                    "type": "buildAddress",
+                    "name": "DAppAddress",
+                    "addr": {
+                        "spendScriptHashHex": "{get('cache.spendingValidator.scriptHashHex')}",
+                        "stakePubKeyHashHex": "{get('cache.stakingKey.pubKeyHashHex')}"
+                    }
                 }
             }
+        },
+        "build": {
+            "type": "buildTx",
+            "name": "Open Limit Order",
+            "tx": {
+                "mints": [
+                    {
+                        "policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}",
+                        "assetName": "{get('args.pairBeacon')}",
+                        "quantity": "1"
+                    },
+                    {
+                        "policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}",
+                        "assetName": "{get('args.offerBeacon')}",
+                        "quantity": "1"
+                    },
+                    {
+                        "policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}",
+                        "assetName": "{get('args.askBeacon')}",
+                        "quantity": "1"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "address": "{get('cache.dependencies.dappAddress')}",
+                        "assets": [
+                            {
+                                "policyId": "ada",
+                                "assetName": "ada",
+                                "quantity": "2000000"
+                            },
+                            {
+                                "policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}",
+                                "assetName": "{get('args.pairBeacon')}",
+                                "quantity": "1"
+                            },
+                            {
+                                "policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}",
+                                "assetName": "{get('args.offerBeacon')}",
+                                "quantity": "1"
+                            },
+                            {
+                                "policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}",
+                                "assetName": "{get('args.askBeacon')}",
+                                "quantity": "1"
+                            },
+                            {
+                                "policyId": "{get('args.offerPolicyId')}",
+                                "assetName": "{get('args.offerAssetName')}",
+                                "quantity": "{get('args.offerQuantity')}"
+                            }
+                        ],
+                        "datum": {
+                            "constructor": 0,
+                            "fields": [
+                                { "bytes": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}" },
+                                { "bytes": "{get('args.pairBeacon')}" },
+                                { "bytes": "{get('args.offerPolicyId')}" },
+                                { "bytes": "{get('args.offerAssetName')}" },
+                                { "bytes": "{get('args.offerBeacon')}" },
+                                { "bytes": "{get('args.askPolicyId')}" },
+                                { "bytes": "{get('args.askAssetName')}" },
+                                { "bytes": "{get('args.askBeacon')}" },
+                                {
+                                    "constructor": 0,
+                                    "fields": [
+                                        { "int": "{get('args.priceNumerator')}" },
+                                        { "int": "{get('args.priceDenominator')}" }
+                                    ]
+                                },
+                                { "constructor": 1, "fields": [] },
+                                { "constructor": 1, "fields": [] }
+                            ]
+                        }
+                    }
+                ],
+                "witnesses": {
+                    "plutus": {
+                        "scripts": [
+                            {
+                                "scriptHex": "{get('cache.dependencies.beaconPolicy.scriptHex')}",
+                                "lang": "{get('cache.dependencies.beaconPolicy.lang')}"
+                            }
+                        ],
+                        "consumers": [
+                            {
+                                "scriptHashHex": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}",
+                                "redeemer": {
+                                    "type": "mint",
+                                    "data": { "constructor": 1, "fields": [] }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        "sign": {
+            "type": "signTxs",
+            "namePattern": "signed-open-limit-order",
+            "detailedPermissions": false,
+            "txs": [
+                "{get('cache.build.txHex')}"
+            ]
+        },
+        "submit": {
+            "type": "submitTxs",
+            "namePattern": "submitted-open-limit-order",
+            "txs": "{get('cache.sign')}"
         }
     }
 }
