@@ -1,0 +1,8 @@
+{
+    "type": "script",
+    "title": "Swap Limit Order",
+    "description": "Fills an existing one-way swap UTxO on the Cardano-Swaps protocol via GCscript. Deposits the ask asset and receives the offer asset.",
+    "exportAs": "swapLimitOrder",
+    "args": {},
+    "run": {}
+}
