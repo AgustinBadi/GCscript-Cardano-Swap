@@ -32,8 +32,8 @@ Rules the application must never violate. Protocol invariants are enforced by th
 * Price numerator and denominator must both be > 0
 * On execution: `offer_taken × price_numerator ≤ ask_given × price_denominator`
 * Only the offer asset may leave the swap UTxO during execution; only the ask asset (and ADA) may enter
-* The output datum must include `prev_input` set to the `TxOutRef` of the consumed swap input
-* `invalid-hereafter` must be set on every Execute transaction
+* The output datum must include `prev_input` set to the `TxOutRef` of the consumed swap input — this prevents double satisfaction: since each `TxOutRef` is unique, each output datum is unique, forcing a one-to-one match between consumed inputs and produced outputs
+* `invalid-hereafter` must be set on Execute transactions only when the swap datum has an `expiration` — it serves as a ledger-enforced proof that the current time has not yet passed the expiration
 * Beacons are minted only when a swap is created and burned only when it is closed — they never circulate freely
 
 **Application invariants:**
@@ -48,10 +48,19 @@ Rules the application must never violate. Protocol invariants are enforced by th
 
 This is a prototype with no UI. Each flow is triggered by opening a GCscript URL directly in the GameChanger wallet. A UI layer is optional and out of scope.
 
+**UTxO lifecycle:**
+```
+Owner: Open    → UTxO holds [offer asset + 3 beacons]
+Taker: Execute → UTxO holds [remaining offer + ask asset deposited + 3 beacons]
+Owner: Close   → UTxO consumed, owner reclaims [ask asset + remaining offer], beacons burned
+```
+The swap owner does **not** receive the ask asset until they explicitly close the swap. A swap can be partially filled multiple times before closing.
+
 **As a Swap Owner:**
 1. *(Optional UI)* Specify offer asset, ask asset, price, and change address → generates GCscript URL
 2. Open GCscript URL in GameChanger wallet
 3. Wallet derives personal DApp address, builds and submits Open Swap transaction → 3 beacons minted, swap UTxO created
+4. *(Later)* Close GCscript URL in GameChanger wallet → swap UTxO consumed, beacons burned, ask asset and remaining offer reclaimed
 
 **As a Taker:**
 1. *(Optional UI)* Query open limit orders by beacon policy ID, filter by asset pair, select a swap → generates GCscript URL
@@ -147,15 +156,17 @@ Each active swap UTxO contains:
 
 ```
 SwapDatum {
-  beacon_policy_id  : PolicyId       -- beacon minting policy
-  beacon_name       : AssetName      -- sha2_256(offer ++ ask)
-  offer_asset       : (PolicyId, AssetName)
-  ask_asset         : (PolicyId, AssetName)
-  offer_beacon_name : AssetName      -- "01" ++ sha2_256(offer)
-  ask_beacon_name   : AssetName      -- "02" ++ sha2_256(ask)
-  price             : Rational       -- ask/offer as (numerator, denominator)
-  prev_input        : Option<TxOutRef>
-  expiration        : Option<POSIXTime>  -- must be divisible by 60,000 ms
+  beacon_id    : PolicyId                -- one-way beacon minting policy
+  pair_beacon  : AssetName               -- sha2_256(offer_id* ++ offer_name ++ ask_id* ++ ask_name)
+  offer_id     : PolicyId                -- policy id of the offer asset
+  offer_name   : AssetName               -- asset name of the offer asset
+  offer_beacon : AssetName               -- sha2_256(0x01 ++ offer_id ++ offer_name)
+  ask_id       : PolicyId                -- policy id of the ask asset
+  ask_name     : AssetName               -- asset name of the ask asset
+  ask_beacon   : AssetName               -- sha2_256(0x02 ++ ask_id ++ ask_name)
+  swap_price   : Rational                -- ask/offer as (numerator, denominator)
+  prev_input   : Option<OutputReference>
+  expiration   : Option<PosixTime>       -- must be divisible by 60,000 ms
 }
 ```
 
@@ -163,11 +174,15 @@ ADA is represented with an empty policy ID (`""`) in asset configs.
 
 #### Beacon Naming
 
+The three beacons enable different off-chain query patterns: `pair_beacon` finds all swaps for a specific trading pair, `offer_beacon` finds all swaps selling a specific asset, and `ask_beacon` finds all swaps buying a specific asset.
+
 ```
-pair_beacon  = sha2_256(offer_policy ++ offer_name ++ ask_policy ++ ask_name)
-offer_beacon = "01" ++ sha2_256(offer_policy ++ offer_name)
-ask_beacon   = "02" ++ sha2_256(ask_policy ++ ask_name)
+pair_beacon  = sha2_256(offer_id* ++ offer_name ++ ask_id* ++ ask_name)
+offer_beacon = sha2_256(0x01 ++ offer_id ++ offer_name)
+ask_beacon   = sha2_256(0x02 ++ ask_id ++ ask_name)
 ```
+
+`*` — when the policy ID is ADA (`""`), substitute `0x00` before hashing so that the pair beacon is directional (ADA/token ≠ token/ADA).
 
 #### Target Network
 
@@ -185,14 +200,14 @@ two-way beacon policy: 84662c22dc5c0cadad7b2ebf9757ce9ea61dbd8fe64bc8c43c112a40
 **Open Swap** (owner only)
 - Mint 3 beacons via `CreateOrCloseSwaps` redeemer
 - Output: swap UTxO at personal DApp address with beacons + offered asset + datum
-- Staking credential must approve
+- Output address must include a staking credential (enforced by the beacon minting policy; no signing check)
 
 **Execute Swap** (permissionless)
 - Redeemer: `Swap`
 - Taker deposits ask asset, takes offer asset
 - Swap UTxO stays alive (partial fills allowed)
 - Price constraint must hold: `offer_taken × price_num ≤ ask_given × price_den`
-- `invalid-hereafter` must be set (for expiration validation)
+- `invalid-hereafter` must be set only if the swap datum has an `expiration`; not required otherwise
 - No approval required
 - **`prev_input` handling** *(non-obvious)*: the output datum must include the `prev_input` field set to the `TxOutRef` (tx hash + output index) of the consumed swap input. The validator checks this explicitly. In GCscript, the consumed UTxO's reference must be read from the input and written into the output datum — it cannot be omitted or left as `None`.
 
@@ -204,13 +219,20 @@ two-way beacon policy: 84662c22dc5c0cadad7b2ebf9757ce9ea61dbd8fe64bc8c43c112a40
 
 #### Price Constraint
 
+`swap_price = numerator / denominator` expresses the minimum rate the swap owner accepts:
+- **numerator** — units of ask asset required
+- **denominator** — units of offer asset given away
+
+The constraint is written as a cross-multiplication to avoid integer division:
+
 ```
-offer_taken × price_numerator ≤ ask_given × price_denominator
+offer_taken × numerator ≤ ask_given × denominator
 ```
 
-Example: price = 1/2 (offer 1 ADA per 2 DJED taken)
-- Taking 100 ADA requires depositing ≥ 50 DJED
-- `100 × 1 ≤ 50 × 2` → `100 ≤ 100` ✓
+Example: owner sells tADA for tDJED and wants at least 2 tDJED per 1 tADA (`numerator=2, denominator=1`)
+- Taker wants 50 tADA → must deposit ≥ 100 tDJED
+- `50 × 2 ≤ 100 × 1` → `100 ≤ 100` ✓
+- If taker tries 80 tDJED: `50 × 2 ≤ 80 × 1` → `100 ≤ 80` ✗ → rejected
 
 #### Key Invariants
 
@@ -377,7 +399,7 @@ No conditionals or loops in ISL — but hashing, address derivation, datum const
 
 #### Capabilities Relevant to This Application
 
-- **Hashing**: SHA256/SHA512 available in ISL — beacon names can be computed inside the script
+- **Hashing**: SHA256/SHA512 available in ISL but only accepts UTF-8 strings, not raw bytes — beacon names require hashing raw byte arrays so they must be pre-computed externally and injected via `args`
 - **Address derivation**: `buildAddress` + staking credential functions can derive the personal DApp address internally; addresses can also be converted to Plutus data directly
 - **UTxO queries by policy ID**: chain query functions support querying by beacon policy ID; filtering may be handled within GCscript as well
 - **Plutus data serialization**: datum construction can be done inside the script
