@@ -66,7 +66,7 @@ Hashing the hex string representation of these bytes (e.g. `sha256("deadbeef")`)
 **Suggestions (either or both):**
 
 1. **Add a `sha256Hex()` ISL function** that accepts a hex-encoded byte string and hashes the underlying bytes:
-   ```
+   ```offer_id
    sha256Hex("deadbeef01cafe...") -> hash of the actual bytes
    ```
 
