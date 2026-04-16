@@ -56,7 +56,7 @@
                             "obj": {
                                 "constructor": 0,
                                 "fields": [
-                                    {"bytes": "{get('cache.beaconPolicy.scriptHashHex')}"},
+                                    {"bytes": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}"},
                                     {"bytes": "{get('args.pairBeacon')}"},
                                     {"bytes": "{get('args.offerPolicyId')}"},
                                     {"bytes": "{get('args.offerAssetName')}"},
@@ -91,7 +91,7 @@
             "tx": {
                 "mints": [
                     {
-                        "policyId": "{get('cache.beaconPolicy.scriptHashHex')}",
+                        "policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}",
                         "idPattern": "beaconMint",
                         "assets": [
                             {"assetNameHex": "{get('args.pairBeacon')}", "quantity": "1"},
@@ -102,12 +102,13 @@
                 ],
                 "outputs": [
                     {
-                        "address": "{get('cache.dappAddress')}",
-                        "datum": {"datumHex": "{get('cache.swapDatum.dataHex')}"},
+                        "address": "{get('cache.dependencies.dappAddress')}",
+                        "datum": {"datumHex": "{get('cache.dependencies.swapDatum.dataHex')}"},
                         "assets": [
-                            {"policyId": "{get('cache.beaconPolicy.scriptHashHex')}", "assetNameHex": "{get('args.pairBeacon')}", "quantity": "1"},
-                            {"policyId": "{get('cache.beaconPolicy.scriptHashHex')}", "assetNameHex": "{get('args.offerBeacon')}", "quantity": "1"},
-                            {"policyId": "{get('cache.beaconPolicy.scriptHashHex')}", "assetNameHex": "{get('args.askBeacon')}", "quantity": "1"},
+                            {"policyId": "ada", "assetName": "ada", "quantity": "2000000"},
+                            {"policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}", "assetNameHex": "{get('args.pairBeacon')}", "quantity": "1"},
+                            {"policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}", "assetNameHex": "{get('args.offerBeacon')}", "quantity": "1"},
+                            {"policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}", "assetNameHex": "{get('args.askBeacon')}", "quantity": "1"},
                             {"policyId": "{get('args.offerPolicyId')}", "assetNameHex": "{get('args.offerAssetName')}", "quantity": "{get('args.offerQuantity')}"}
                         ]
                     }
@@ -116,15 +117,15 @@
                     "plutus": {
                         "scripts": [
                             {
-                                "scriptHex": "{get('cache.beaconPolicy.scriptHex')}",
-                                "lang": "{get('cache.beaconPolicy.lang')}"
+                                "scriptHex": "{get('cache.dependencies.beaconPolicy.scriptHex')}",
+                                "lang": "{get('cache.dependencies.beaconPolicy.lang')}"
                             }
                         ],
                         "consumers": [
                             {
-                                "scriptHashHex": "{get('cache.beaconPolicy.scriptHashHex')}",
+                                "scriptHashHex": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}",
                                 "redeemer": {
-                                    "dataHex": "{get('cache.beaconRedeemer.dataHex')}",
+                                    "dataHex": "{get('cache.dependencies.beaconRedeemer.dataHex')}",
                                     "type": "mint",
                                     "itemIdPattern": "beaconMint"
                                 }
