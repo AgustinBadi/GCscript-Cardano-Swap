@@ -40,6 +40,53 @@
                 },
                 "stakingKey": {
                     "type": "getStakingPublicKey"
+                },
+                "beaconRedeemer": {
+                    "type": "plutusData",
+                    "data": {
+                        "fromJSON": {
+                            "schema": 1,
+                            "obj": {
+                                "constructor": 1,
+                                "fields": []
+                            }
+                        }
+                    }
+                },
+                "swapDatum": {
+                    "type": "plutusData",
+                    "data": {
+                        "fromJSON": {
+                            "schema": 1,
+                            "obj": {
+                                "constructor": 0,
+                                "fields": [
+                                    {"bytes": "{get('cache.beaconPolicy.scriptHashHex')}"},
+                                    {"bytes": "{get('args.pairBeacon')}"},
+                                    {"bytes": "{get('args.offerPolicyId')}"},
+                                    {"bytes": "{get('args.offerAssetName')}"},
+                                    {"bytes": "{get('args.offerBeacon')}"},
+                                    {"bytes": "{get('args.askPolicyId')}"},
+                                    {"bytes": "{get('args.askAssetName')}"},
+                                    {"bytes": "{get('args.askBeacon')}"},
+                                    {"constructor": 0, "fields": [
+                                        {"int": "{get('args.priceNumerator')}"},
+                                        {"int": "{get('args.priceDenominator')}"}
+                                    ]},
+                                    {"constructor": 1, "fields": []},
+                                    {"constructor": 1, "fields": []}
+                                ]
+                            }
+                        }
+                    }
+                },
+                "dappAddress": {
+                    "type": "buildAddress",
+                    "name": "DAppAddress",
+                    "addr": {
+                        "spendScriptHashHex": "{get('cache.spendingValidator.scriptHashHex')}",
+                        "stakePubKeyHashHex": "{get('cache.stakingKey')}"
+                    }
                 }
             }
         }
