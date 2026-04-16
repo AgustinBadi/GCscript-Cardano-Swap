@@ -4,13 +4,13 @@
     "description": "Creates a one-way swap UTxO on the Cardano-Swaps protocol via GCscript.",
     "exportAs": "openLimitOrder",
     "args": {
-        "offerPolicyId": "8db269c3ec630e06ae29f74bc39edd1f87c819f1056206e879a1cd61",
-        "offerAssetName": "444a4544",
-        "askPolicyId": "",
-        "askAssetName": "",
-        "pairBeacon": "a4cee6383183b45ec93478341a223a4cef44cd993f7fef872c60c863fbb86b06",
-        "offerBeacon": "4bd6e756a3dd4ddd0e8ef3274ed4f8d33b76b452c7d0c9329f212b5db1332b19",
-        "askBeacon": "dbc1b4c900ffe48d575b5da5c638040125f65db0fe3e24494b76ea986457d986",
+        "offerPolicyId": "",
+        "offerAssetName": "",
+        "askPolicyId": "8db269c3ec630e06ae29f74bc39edd1f87c819f1056206e879a1cd61",
+        "askAssetName": "444a4544",
+        "pairBeacon": "450a3157797dfb43a68b94abf851bcb9c447421a726528fc6fcffc8c53aed038",
+        "offerBeacon": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+        "askBeacon": "48d9f08789c6b4fc956df426dbd193eefbfa5102e924397c0904de27df427ff2",
         "priceNumerator": "1",
         "priceDenominator": "1",
         "offerQuantity": "1000000"
@@ -57,16 +57,16 @@
                                 "constructor": 0,
                                 "fields": [
                                     {"bytes": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}"},
-                                    {"bytes": "{get('args.pairBeacon')}"},
-                                    {"bytes": "{get('args.offerPolicyId')}"},
-                                    {"bytes": "{get('args.offerAssetName')}"},
-                                    {"bytes": "{get('args.offerBeacon')}"},
-                                    {"bytes": "{get('args.askPolicyId')}"},
-                                    {"bytes": "{get('args.askAssetName')}"},
-                                    {"bytes": "{get('args.askBeacon')}"},
+                                    {"bytes": "{get('cache.args.pairBeacon')}"},
+                                    {"bytes": "{get('cache.args.offerPolicyId')}"},
+                                    {"bytes": "{get('cache.args.offerAssetName')}"},
+                                    {"bytes": "{get('cache.args.offerBeacon')}"},
+                                    {"bytes": "{get('cache.args.askPolicyId')}"},
+                                    {"bytes": "{get('cache.args.askAssetName')}"},
+                                    {"bytes": "{get('cache.args.askBeacon')}"},
                                     {"constructor": 0, "fields": [
-                                        {"int": "{get('args.priceNumerator')}"},
-                                        {"int": "{get('args.priceDenominator')}"}
+                                        {"int": "{get('cache.args.priceNumerator')}"},
+                                        {"int": "{get('cache.args.priceDenominator')}"}
                                     ]},
                                     {"constructor": 1, "fields": []},
                                     {"constructor": 1, "fields": []}
@@ -79,8 +79,8 @@
                     "type": "buildAddress",
                     "name": "DAppAddress",
                     "addr": {
-                        "spendScriptHashHex": "{get('cache.spendingValidator.scriptHashHex')}",
-                        "stakePubKeyHashHex": "{get('cache.stakingKey')}"
+                        "spendScriptHashHex": "{get('cache.dependencies.spendingValidator.scriptHashHex')}",
+                        "stakePubKeyHashHex": "{get('cache.dependencies.stakingKey')}"
                     }
                 }
             }
@@ -109,7 +109,7 @@
                             {"policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}", "assetNameHex": "{get('args.pairBeacon')}", "quantity": "1"},
                             {"policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}", "assetNameHex": "{get('args.offerBeacon')}", "quantity": "1"},
                             {"policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}", "assetNameHex": "{get('args.askBeacon')}", "quantity": "1"},
-                            {"policyId": "{get('args.offerPolicyId')}", "assetNameHex": "{get('args.offerAssetName')}", "quantity": "{get('args.offerQuantity')}"}
+                            {"policyId": "ada", "assetName": "ada", "quantity": "{get('args.offerQuantity')}"}
                         ]
                     }
                 ],
