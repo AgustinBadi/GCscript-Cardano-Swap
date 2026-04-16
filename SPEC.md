@@ -339,9 +339,9 @@ Coin selection and change outputs are handled automatically.
     "address": "addr1...",
     "assets": [
         { "policyId": "ada", "quantity": "2000000" },
-        { "policyId": "<hex>", "assetName": "<hex>", "quantity": "1" }
+        { "policyId": "<hex>", "assetNameHex": "<hex>", "quantity": "1" }  // assetNameHex for non-UTF8 names
     ],
-    "datum": { ... }   // inline datum as Plutus data
+    "datum": { "datumHex": "<hex>" }   // inline datum: full CBOR hex, not a hash
 }
 ```
 
@@ -362,18 +362,31 @@ Coin selection and change outputs are handled automatically.
 
 #### Minting / Burning
 
+Mints go in `buildTx.tx.mints`. The Plutus script and redeemer go in `buildTx.tx.witnesses.plutus`:
+
 ```json
-{
-    "policyId": "<hex>",
-    "assetName": "<hex>",
-    "quantity": "1",       // negative = burn
-    "redeemer": {
-        "data": { ... },
-        "budget": { "mem": "...", "cpu": "..." }
-    },
-    "script": {
-        "type": "plutusScript",
-        "script": { "type": "cbor", "cbor": "<compiled_script_hex>" }
+"mints": [
+    {
+        "policyId": "<hex>",
+        "idPattern": "<tag>",
+        "assets": [
+            { "assetNameHex": "<hex>", "quantity": "1" }
+        ]
+    }
+],
+"witnesses": {
+    "plutus": {
+        "scripts": [ { "scriptHex": "<hex>", "lang": "plutus_v2" } ],
+        "consumers": [
+            {
+                "scriptHashHex": "<hex>",
+                "redeemer": {
+                    "dataHex": "<hex>",
+                    "type": "mint",
+                    "itemIdPattern": "<tag>"
+                }
+            }
+        ]
     }
 }
 ```
@@ -400,7 +413,7 @@ Dynamic values are expressed inline with `{...}` syntax:
 Key ISL functions:
 - `get(path)` — read from cache or exports
 - `addBigNum / subBigNum / mulBigNum` — arbitrary precision arithmetic
-- `sha256() / sha512()` — hashing
+- `sha256() / sha512()` — hashing (accepts UTF-8 string or byte array; use `hexToByteArray()` to hash raw bytes from a hex string)
 - `strToHex() / hexToStr()` — encoding
 - `addressBech32ToPlutusDataObj()` — convert address to Plutus data
 - `getAddressInfo()` — extract payment/staking credential from address

@@ -13,7 +13,7 @@ Create a one-way swap UTxO at the user's personal DApp address.
 - Mint exactly 1 of each beacon (pair, offer, ask) via `CreateOrCloseSwaps` redeemer (constructor 1)
 - Any unused beacons must be burned in the same transaction
 - Construct `SwapDatum` inline in GCscript using `args` and runtime cache values:
-  - `beacon_id` == beacon policy id (from runtime cache after `scriptParams`)
+  - `beacon_id` == beacon policy id (hardcoded: `c4d7d117d9ebcde6db28db40837ff2b1401e9eaaa6eecea9e070e209`)
   - `pair_beacon`, `offer_beacon`, `ask_beacon` must match the minted beacon asset names
   - `offer_id` / `offer_name` and `ask_id` / `ask_name` must be different assets
   - `swap_price` numerator and denominator must both be > 0
@@ -52,12 +52,12 @@ Cancel an existing open limit order and reclaim assets.
 ## Architecture Decisions
 
 - **Beacon names pre-computed externally**: ISL `sha256()` accepts UTF-8 strings, not raw bytes. The three beacon names require hashing raw byte arrays (including the ADA `0x00` substitution for the pair beacon). They must be computed outside GCscript and injected via `args`.
-- **Two validators, different parameterization**: `swap_script` has no parameters and is used as-is. `beacon_script` takes `dapp_hash` (the spending validator script hash) as a validator-level parameter, applied at runtime via GCscript `scriptParams`.
+- **Beacon script pre-parameterized offline**: `swap_script` has no parameters and is used as-is. `beacon_script` takes `dapp_hash` (the spending validator script hash) as a validator-level parameter. This is applied once offline via `aiken blueprint apply` and the resulting CBOR is hardcoded directly in the script — no runtime `scriptParams` needed. Parameterized beacon policy hash: `c4d7d117d9ebcde6db28db40837ff2b1401e9eaaa6eecea9e070e209`.
 - **Script CBORs already compiled**: `contracts/cardano-swaps/aiken/plutus.json` contains the compiled CBOR for both validators. No Aiken compilation step needed.
 
 ## Open Issues
 
 - **UTxO filtering**: confirm with GCscript developer whether filtering by asset pair can be done inside the query or must be handled externally between Query and Execute steps
-- **`scriptHex` after `scriptParams`**: unconfirmed whether GCscript returns the *parameterized* CBOR in `scriptHex` after applying `scriptParams`. If it returns the original, the minting witness will carry the wrong script and validation will fail.
+- ~~**`scriptHex` after `scriptParams`**~~: **Resolved.** GCscript returns the parameterized CBOR in `scriptHex` after applying `scriptParams`. Confirmed from the `Plutus Script Parametrization` example — the parameterized script produces a distinct `scriptHashHex`, meaning the CBOR itself changed. `cache.beaconPolicy.scriptHex` is safe to use as the minting witness script.
 - **ADA-as-offer edge case**: the datum encodes ADA's policy as empty bytes `""`, but GCscript asset specs use `"ada"`. A single `args.offerPolicyId` cannot serve both roles without ISL conditionals (which don't exist). Needs two separate args or a dedicated ADA-offer script variant.
 - **Execute datum requires dynamic `prev_input`**: The output datum must include `prev_input` set to the `TxOutRef` of the consumed swap UTxO (tx hash + output index). This value is not known until the UTxO is selected, so the full `SwapDatum` must be computed externally after UTxO selection and injected via `args.datumHex`.
