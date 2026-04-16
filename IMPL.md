@@ -9,11 +9,18 @@ Three GCscript transactions to implement, in order of priority:
 Create a one-way swap UTxO at the user's personal DApp address.
 
 - Derive personal DApp address from spending validator + user staking credential
-- Compute beacon names via SHA256 hashing inside GCscript
-- Mint 3 beacons (pair, offer, ask) via `CreateOrCloseSwaps` redeemer
-- Construct `SwapDatum` inline with offer asset, ask asset, price, beacon fields
+- Beacon names pre-computed externally and injected via `args` (ISL sha256 does not accept raw bytes)
+- Mint exactly 1 of each beacon (pair, offer, ask) via `CreateOrCloseSwaps` redeemer (constructor 1)
+- Any unused beacons must be burned in the same transaction
+- Construct `SwapDatum` inline in GCscript using `args` and runtime cache values:
+  - `beacon_id` == beacon policy id (from runtime cache after `scriptParams`)
+  - `pair_beacon`, `offer_beacon`, `ask_beacon` must match the minted beacon asset names
+  - `offer_id` / `offer_name` and `ask_id` / `ask_name` must be different assets
+  - `swap_price` numerator and denominator must both be > 0
+  - `expiration` if set must be divisible by 60,000ms
 - Output: swap UTxO at personal DApp address with beacons + offered asset + datum
-- Staking credential must sign
+- Output address must include a staking credential (no signing check at open time)
+- No extraneous assets in the output UTxO
 
 ### 2. Take Limit-Swap (Execute)
 
@@ -23,7 +30,7 @@ Fill an existing open limit order.
 - Consume the swap UTxO with `Swap` redeemer
 - Construct output datum with `prev_input` set to the consumed UTxO's `TxOutRef`
 - Deposit ask asset, receive offer asset
-- Set `invalid-hereafter` on the transaction
+- Set `invalid-hereafter` only if the swap datum has an `expiration`
 - Permissionless — no signing requirement
 
 ### 3. Close Limit-Swap
@@ -31,8 +38,9 @@ Fill an existing open limit order.
 Cancel an existing open limit order and reclaim assets.
 
 - Consume the swap UTxO with `SpendWithMint` redeemer on the spending validator
-- Burn all 3 beacons via `CreateOrCloseSwaps` redeemer on the beacon minting policy
-- Return remaining assets to owner
+- Burn all 3 beacons via `CreateOrCloseSwaps` redeemer (constructor 1) on the beacon minting policy
+- All 3 beacons must be burned — no stray beacons may remain
+- Return remaining assets (ask asset accumulated + remaining offer asset) to owner
 - Staking credential must sign
 
 ---
@@ -52,3 +60,4 @@ Cancel an existing open limit order and reclaim assets.
 - **UTxO filtering**: confirm with GCscript developer whether filtering by asset pair can be done inside the query or must be handled externally between Query and Execute steps
 - **`scriptHex` after `scriptParams`**: unconfirmed whether GCscript returns the *parameterized* CBOR in `scriptHex` after applying `scriptParams`. If it returns the original, the minting witness will carry the wrong script and validation will fail.
 - **ADA-as-offer edge case**: the datum encodes ADA's policy as empty bytes `""`, but GCscript asset specs use `"ada"`. A single `args.offerPolicyId` cannot serve both roles without ISL conditionals (which don't exist). Needs two separate args or a dedicated ADA-offer script variant.
+- **Execute datum requires dynamic `prev_input`**: The output datum must include `prev_input` set to the `TxOutRef` of the consumed swap UTxO (tx hash + output index). This value is not known until the UTxO is selected, so the full `SwapDatum` must be computed externally after UTxO selection and injected via `args.datumHex`.

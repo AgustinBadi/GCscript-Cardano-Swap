@@ -35,6 +35,7 @@ Rules the application must never violate. Protocol invariants are enforced by th
 * The output datum must include `prev_input` set to the `TxOutRef` of the consumed swap input — this prevents double satisfaction: since each `TxOutRef` is unique, each output datum is unique, forcing a one-to-one match between consumed inputs and produced outputs
 * `invalid-hereafter` must be set on Execute transactions only when the swap datum has an `expiration` — it serves as a ledger-enforced proof that the current time has not yet passed the expiration
 * Beacons are minted only when a swap is created and burned only when it is closed — they never circulate freely
+* A swap requires at least three transactions: Open (owner mints beacons, locks offer), Execute (taker deposits ask, takes offer), Close (owner burns beacons, reclaims ask + remaining offer). Execute may happen multiple times before Close.
 
 **Application invariants:**
 * Only one-way swap interactions are constructed — no two-way swap transactions
@@ -216,6 +217,25 @@ two-way beacon policy: 84662c22dc5c0cadad7b2ebf9757ce9ea61dbd8fe64bc8c43c112a40
 - Burn all 3 beacons
 - Owner reclaims remaining assets
 - Staking credential must approve
+
+**Spending Redeemers** (`SpendWithMint` vs `SpendWithStake`)
+
+The spending validator has two owner-only redeemers depending on whether beacons need to change:
+
+- `SpendWithMint` — pairs with `CreateOrCloseSwaps` (minting policy execution). Required when beacons must be minted or burned, i.e. Close Swap or changing the trading pair.
+- `SpendWithStake` — pairs with `UpdateSwaps` (staking script execution via withdrawal). Used when only the price or expiration is updated and beacons stay unchanged. Cheaper because staking script executions cost less than minting executions on Cardano.
+
+Both redeemers require the staking credential to approve.
+
+**Beacon Redeemers** (`RegisterBeaconScript`, `CreateOrCloseSwaps`, `UpdateSwaps`)
+
+Three redeemers for the beacon minting policy, each for a different execution context:
+
+- `RegisterBeaconScript` (constructor 0) — registers the beacon script as a staking script on-chain. Required once per deployment before `UpdateSwaps` can be used, since the ledger must recognize the script credential before it can execute via withdrawals. This is a one-time setup — the first user of the protocol on a given network triggers it, and it stays registered for everyone. On Preprod, this has already been done.
+- `CreateOrCloseSwaps` (constructor 1) — runs as a minting policy. Used for Open Swap (mint 3 beacons) and Close Swap (burn 3 beacons). Validates beacon destinations and datum correctness.
+- `UpdateSwaps` (constructor 2) — runs as a staking script via withdrawal. Used for repricing or updating expiration without minting or burning. Same validation logic as `CreateOrCloseSwaps` but cheaper.
+
+The constructor indices matter for Plutus data — the minting redeemer for Open Swap is `{ "constructor": 1, "fields": [] }`.
 
 #### Price Constraint
 
