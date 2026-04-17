@@ -1038,18 +1038,22 @@
         if (key === 'openLimitOrder') {
           const offerA  = ASSETS[app.custom.offerAssetKey] || ASSETS.ada;
           const askA    = ASSETS[app.custom.askAssetKey]   || ASSETS.fakeUSD;
-          const offerQty   = Math.floor(Number(app.custom.offerQty))   || 0;
-          const receiveQty = Math.floor(Number(app.custom.receiveQty)) || 0;
+          // Widget values are in human units (e.g. "10" means 10 USDM or 10 ADA).
+          // Scale to on-chain base units using each asset's decimal count.
+          const offerScale = Math.pow(10, offerA.decimals || 0);
+          const askScale   = Math.pow(10, askA.decimals   || 0);
+          const offerRaw   = Math.round((Number(app.custom.offerQty)   || 0) * offerScale);
+          const receiveRaw = Math.round((Number(app.custom.receiveQty) || 0) * askScale);
           // Sync all hex args from widget state
           args['offer-policy-id']  = offerA.policyId;
           args['offer-asset-name'] = offerA.assetNameHex;
           args['ask-policy-id']    = askA.policyId;
           args['ask-asset-name']   = askA.assetNameHex;
-          args['offer-quantity']   = String(offerQty);
-          if (offerQty > 0 && receiveQty > 0) {
-            const g = gcd(receiveQty, offerQty);
-            args['price-numerator']   = String(receiveQty / g);
-            args['price-denominator'] = String(offerQty / g);
+          args['offer-quantity']   = String(offerRaw);
+          if (offerRaw > 0 && receiveRaw > 0) {
+            const g = gcd(receiveRaw, offerRaw);
+            args['price-numerator']   = String(receiveRaw / g);
+            args['price-denominator'] = String(offerRaw / g);
           } else {
             args['price-numerator']   = '1';
             args['price-denominator'] = '1';
@@ -1065,8 +1069,8 @@
           // Validations
           if (app.custom.offerAssetKey === app.custom.askAssetKey)
             validations.push({ level: 'err', blocking: true, message: 'Offer and ask assets must be different.' });
-          if (!(offerQty > 0))   validations.push({ level: 'err', blocking: true, message: 'Enter an offer amount.' });
-          if (!(receiveQty > 0)) validations.push({ level: 'err', blocking: true, message: 'Enter a minimum receive amount.' });
+          if (!(offerRaw > 0))   validations.push({ level: 'err', blocking: true, message: 'Enter an offer amount.' });
+          if (!(receiveRaw > 0)) validations.push({ level: 'err', blocking: true, message: 'Enter a minimum receive amount.' });
         }
 
         if (key === 'swapLimitOrder') {
@@ -1224,7 +1228,7 @@
             <div class="swap-box">
               <div class="swap-box__label">You offer</div>
               <div class="swap-box__row">
-                <input id="sw-offer-qty" type="number" class="swap-amt" placeholder="0" min="1" step="1">
+                <input id="sw-offer-qty" type="number" class="swap-amt" placeholder="0" min="0" step="any">
                 <select id="sw-offer-asset" class="asset-btn">${opts}</select>
               </div>
             </div>
@@ -1234,7 +1238,7 @@
             <div class="swap-box">
               <div class="swap-box__label">You receive <span class="muted">(minimum)</span></div>
               <div class="swap-box__row">
-                <input id="sw-receive-qty" type="number" class="swap-amt" placeholder="0" min="1" step="1">
+                <input id="sw-receive-qty" type="number" class="swap-amt" placeholder="0" min="0" step="any">
                 <select id="sw-ask-asset" class="asset-btn">${opts}</select>
               </div>
               <div id="sw-price-info" class="swap-price-info"></div>
@@ -1382,10 +1386,10 @@
 
   /** Known asset catalog for the Open Limit Order picker. */
   const ASSETS = {
-    ada:     { label: 'tADA', policyId: '',                                                         assetNameHex: '' },
-    fakeUSD: { label: 'FAKE', policyId: '044f78848ab25cbe7a84c0c6768d7fb98d7a99cad21e6f8298354923', assetNameHex: '46616b65555344' },
-    usdm:    { label: 'USDM', policyId: 'd4fece6b39f7cd78a3f036b2ae6508c13524b863922da80f68dd9ab7', assetNameHex: '5553444d' },
-    gc:      { label: 'GC',   policyId: '044f78848ab25cbe7a84c0c6768d7fb98d7a99cad21e6f8298354923', assetNameHex: '47616d654368616e676572546f6b656ef09f9a80' },
+    ada:     { label: 'tADA', policyId: '',                                                         assetNameHex: '',                                         decimals: 6 },
+    fakeUSD: { label: 'FAKE', policyId: '044f78848ab25cbe7a84c0c6768d7fb98d7a99cad21e6f8298354923', assetNameHex: '46616b65555344',                           decimals: 6 },
+    usdm:    { label: 'USDM', policyId: 'd4fece6b39f7cd78a3f036b2ae6508c13524b863922da80f68dd9ab7', assetNameHex: '5553444d',                               decimals: 6 },
+    gc:      { label: 'GC',   policyId: '044f78848ab25cbe7a84c0c6768d7fb98d7a99cad21e6f8298354923', assetNameHex: '47616d654368616e676572546f6b656ef09f9a80', decimals: 6 },
   };
   const ASSET_OPTIONS = Object.entries(ASSETS).map(([v, a]) => ({ value: v, label: a.label }));
 
