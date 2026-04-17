@@ -758,7 +758,8 @@
               "offer-policy-id": "",
               "offer-asset-name": "",
               "ask-policy-id": "",
-              "ask-asset-name": ""
+              "ask-asset-name": "",
+              "output-assets": "[]"
             },
             "run": {
               "dependencies": {
@@ -814,6 +815,9 @@
                         }
                       }
                     }
+                  },
+                  "ownerAddress": {
+                    "type": "getCurrentAddress"
                   }
                 }
               },
@@ -826,6 +830,12 @@
                       "txHash": "{get('args.swap-tx-hash')}",
                       "index": "{jsonToObj(get('args.swap-tx-index'))}",
                       "idPattern": "swap-input"
+                    }
+                  ],
+                  "outputs": [
+                    {
+                      "address": "{get('cache.dependencies.ownerAddress')}",
+                      "assets": "{jsonToObj(get('args.output-assets'))}"
                     }
                   ],
                   "mints": [
@@ -1306,8 +1316,9 @@
               a['ask-asset-name']           = order.askName;
               a['price-numerator']          = String(order.priceNum);
               a['price-denominator']        = String(order.priceDen);
-              // Full fill by default: take all offer, nothing remains
-              a['remaining-offer-quantity'] = '0';
+              // GCScript rejects quantity=0 for tokens; leave 1 unit (dust) so the output is valid.
+              // For tokens like USDM (6 decimals), 1 unit = 0.000001 — economically a full fill.
+              a['remaining-offer-quantity'] = '1';
               // Min-ADA for the remaining output UTxO (holds beacons + remaining tokens)
               a['output-ada-quantity']      = '2000000';
             } else if (action === 'close') {
@@ -1320,6 +1331,42 @@
               a['offer-asset-name']      = order.offerName;
               a['ask-policy-id']         = order.askId;
               a['ask-asset-name']        = order.askName;
+              a['output-assets']         = '[]';
+              // Fetch UTxO assets from Blockfrost so we can provide an explicit output
+              // that lets GCScript balance the beacon-burn transaction correctly.
+              (async () => {
+                const apiKey = app.options.blockfrostApiKey;
+                if (!apiKey) return;
+                try {
+                  const BEACON = 'c4d7d117d9ebcde6db28db40837ff2b1401e9eaaa6eecea9e070e209';
+                  const r = await fetch(
+                    `https://cardano-preprod.blockfrost.io/api/v0/txs/${order.txHash}/utxos`,
+                    { headers: { 'project_id': apiKey } }
+                  );
+                  if (!r.ok) return;
+                  const data = await r.json();
+                  const out = data.outputs && (
+                    data.outputs.find(o => o.output_index === order.txIndex) ||
+                    data.outputs[order.txIndex]
+                  );
+                  if (!out || !out.amount) return;
+                  // Exclude beacon tokens (they will be burned); keep ADA + other assets
+                  const assets = [];
+                  for (const entry of out.amount) {
+                    if (entry.unit === 'lovelace') {
+                      assets.push({ policyId: 'ada', assetName: 'ada', quantity: entry.quantity });
+                    } else if (!entry.unit.startsWith(BEACON)) {
+                      assets.push({
+                        policyId:     entry.unit.slice(0, 56),
+                        assetNameHex: entry.unit.slice(56),
+                        quantity:     entry.quantity
+                      });
+                    }
+                  }
+                  a['output-assets'] = JSON.stringify(assets);
+                  app.dirty = true;
+                } catch (_) {}
+              })();
             }
             app.dirty = true;
           };
