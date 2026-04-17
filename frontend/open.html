@@ -31,6 +31,7 @@
 .console{min-height:120px;max-height:420px;overflow:auto;padding:14px;border-radius:14px;border:1px solid var(--line);background:#060c1fcb;color:#cbf7ff}.empty{color:var(--muted)}.status{font-size:12px;min-height:18px}.status--info{color:var(--info)}.status--ok,.status--success{color:var(--success)}.status--warn{color:var(--warn)}.status--err,.status--danger{color:var(--danger)}.status--mute{color:var(--mute)}.hidden{display:none!important}.stat{padding:12px;border-radius:14px;border:1px solid var(--line);background:#ffffff04}.stat strong{display:block;margin-top:4px;font-size:15px;color:var(--cyan)}
 .app-footer{padding:16px 0 0;text-align:center}.app-footer__links{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:0}.app-footer__links{font-size:12px}.app-footer__library{margin-top:10px;font-size:13px;font-weight:600}.app-footer a{color:var(--blue)}.app-footer a:hover{text-decoration:underline}.app-footer__text{color:var(--muted)}
 .orders-table-wrap{overflow-x:auto}.orders-table{width:100%;border-collapse:collapse;font-size:13px}.orders-table th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);color:var(--cyan);font-size:11px;text-transform:uppercase;letter-spacing:.08em}.orders-table td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}.orders-table tr:last-child td{border-bottom:none}.orders-table tbody tr:hover td{background:#ffffff06}.orders-actions{display:flex;gap:6px;white-space:nowrap}[data-theme="light"] .orders-table tbody tr:hover td{background:#00000006}
+.swap-box{padding:16px;border-radius:16px;border:1px solid var(--line);background:var(--glass)}.swap-box__label{font-size:13px;color:var(--muted);margin-bottom:10px}.swap-box__row{display:flex;align-items:center;gap:10px}.swap-amt{flex:1;background:transparent;border:none;font-size:28px;font-weight:600;color:var(--fg);padding:0;min-width:0;width:100%}.swap-amt:focus{outline:none}.swap-amt::placeholder{color:var(--line)}.asset-btn{appearance:none;-webkit-appearance:none;border:1px solid var(--line);border-radius:99px;padding:8px 16px;background:var(--bg2);color:var(--fg);cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap;flex-shrink:0}.asset-btn:focus{outline:none;border-color:var(--cyan)}.swap-divider{display:flex;justify-content:center;margin:-2px 0;position:relative;z-index:1}.swap-flip-btn{border-radius:50%!important;width:36px;height:36px;padding:0;background:var(--bg2)!important;border-color:var(--line)!important;font-size:16px}.swap-price-info{margin-top:10px;font-size:12px;color:var(--muted)}.swap-extra{padding-top:4px}[data-theme="light"] .swap-box{background:var(--glass2)}[data-theme="light"] .asset-btn{background:var(--bg2)}
 @media (max-width:940px){.layout,.layout--single,.mini-grid{grid-template-columns:1fr}.hero__top{flex-direction:column}.hero__tools{width:100%;justify-content:flex-end}.connected-wallet{width:100%}.connected-wallet__name,.connected-wallet__sub,.connected-wallet__address{max-width:none}.btn--primary,#connect-link{width:100%;max-width:100%}}
 </style>
 </head>
@@ -74,6 +75,8 @@
 </div>
 
 <div id="intent-meta" class="intent-meta"></div>
+
+<div id="open-order-widget" class="stack hidden"></div>
 
 <section id="args-section" class="stack hidden">
 <div><h2 class="section-title">Details</h2></div>
@@ -199,7 +202,13 @@
         custom: {
           orders: [],
           queryStatus: 'idle',
-          queryMessage: ''
+          queryMessage: '',
+          currentSlot: 0,
+          offerAssetKey: 'ada',
+          askAssetKey: 'fakeUSD',
+          offerQty: '',
+          receiveQty: '',
+          expiryMins: 0
         }
       },
 
@@ -261,12 +270,7 @@
             }
           },
           intents: {
-            openLimitOrder: {
-              'offer-policy-id': { kind: 'text', full: true },
-              'offer-asset-name': { kind: 'text', full: true },
-              'ask-policy-id':    { kind: 'text', full: true },
-              'ask-asset-name':   { kind: 'text', full: true }
-            },
+            openLimitOrder: {},
             swapLimitOrder: {
               'swap-tx-hash':           { kind: 'text', full: true },
               'swap-tx-index':          { kind: 'number' },
@@ -333,9 +337,10 @@
               "offer-asset-name": "",
               "ask-policy-id": "",
               "ask-asset-name": "",
-              "price-numerator": "",
-              "price-denominator": "",
-              "offer-quantity": ""
+              "price-numerator": "1",
+              "price-denominator": "1",
+              "offer-quantity": "0",
+              "expiration-datum": "{\"constructor\":1,\"fields\":[]}"
             },
             "run": {
               "dependencies": {
@@ -423,10 +428,7 @@
                               "constructor": 1,
                               "fields": []
                             },
-                            {
-                              "constructor": 1,
-                              "fields": []
-                            }
+                            "{jsonToObj(get('args.expiration-datum'))}"
                           ]
                         }
                       }
@@ -1024,11 +1026,37 @@
         const args = code.args || {};
 
         if (key === 'openLimitOrder') {
-          if (!text(args['offer-policy-id'])) validations.push({ level: 'err', blocking: true, message: 'Offer Policy ID is required.' });
-          if (!text(args['offer-asset-name'])) validations.push({ level: 'err', blocking: true, message: 'Offer Asset Name is required.' });
-          if (!(Number(args['price-numerator']) > 0)) validations.push({ level: 'err', blocking: true, message: 'Price numerator must be > 0.' });
-          if (!(Number(args['price-denominator']) > 0)) validations.push({ level: 'err', blocking: true, message: 'Price denominator must be > 0.' });
-          if (!(Number(args['offer-quantity']) > 0)) validations.push({ level: 'err', blocking: true, message: 'Offer quantity must be > 0.' });
+          const offerA  = ASSETS[app.custom.offerAssetKey] || ASSETS.ada;
+          const askA    = ASSETS[app.custom.askAssetKey]   || ASSETS.fakeUSD;
+          const offerQty   = Math.floor(Number(app.custom.offerQty))   || 0;
+          const receiveQty = Math.floor(Number(app.custom.receiveQty)) || 0;
+          // Sync all hex args from widget state
+          args['offer-policy-id']  = offerA.policyId;
+          args['offer-asset-name'] = offerA.assetNameHex;
+          args['ask-policy-id']    = askA.policyId;
+          args['ask-asset-name']   = askA.assetNameHex;
+          args['offer-quantity']   = String(offerQty);
+          if (offerQty > 0 && receiveQty > 0) {
+            const g = gcd(receiveQty, offerQty);
+            args['price-numerator']   = String(receiveQty / g);
+            args['price-denominator'] = String(offerQty / g);
+          } else {
+            args['price-numerator']   = '1';
+            args['price-denominator'] = '1';
+          }
+          // Expiration datum
+          const expMins = Number(app.custom.expiryMins) || 0;
+          if (expMins > 0 && app.custom.currentSlot > 0) {
+            const slot = app.custom.currentSlot + expMins * 60;
+            args['expiration-datum'] = JSON.stringify({ constructor: 0, fields: [{ int: slot }] });
+          } else {
+            args['expiration-datum'] = '{"constructor":1,"fields":[]}';
+          }
+          // Validations
+          if (app.custom.offerAssetKey === app.custom.askAssetKey)
+            validations.push({ level: 'err', blocking: true, message: 'Offer and ask assets must be different.' });
+          if (!(offerQty > 0))   validations.push({ level: 'err', blocking: true, message: 'Enter an offer amount.' });
+          if (!(receiveQty > 0)) validations.push({ level: 'err', blocking: true, message: 'Enter a minimum receive amount.' });
         }
 
         if (key === 'swapLimitOrder') {
@@ -1070,6 +1098,39 @@
        *   `connect` intent is available
        */
       render(app) {
+        // Swap widget: show/hide based on current intent, then sync values
+        const isOpen = app.ui.currentIntentKey === 'openLimitOrder';
+        const argsSection = $('args-section');
+        const swWidget = $('open-order-widget');
+        if (argsSection) argsSection.classList.toggle('hidden', isOpen);
+        if (swWidget) {
+          swWidget.classList.toggle('hidden', !isOpen);
+          if (isOpen) {
+            const offerQtyEl   = $('sw-offer-qty');
+            const receiveQtyEl = $('sw-receive-qty');
+            const offerAssetEl = $('sw-offer-asset');
+            const askAssetEl   = $('sw-ask-asset');
+            const expiryEl     = $('sw-expiry');
+            const priceInfoEl  = $('sw-price-info');
+            if (offerQtyEl   && document.activeElement !== offerQtyEl)   offerQtyEl.value   = app.custom.offerQty   || '';
+            if (receiveQtyEl && document.activeElement !== receiveQtyEl) receiveQtyEl.value = app.custom.receiveQty || '';
+            if (offerAssetEl) offerAssetEl.value = app.custom.offerAssetKey;
+            if (askAssetEl)   askAssetEl.value   = app.custom.askAssetKey;
+            if (expiryEl && document.activeElement !== expiryEl) expiryEl.value = app.custom.expiryMins || 0;
+            if (priceInfoEl) {
+              const oQty = Math.floor(Number(app.custom.offerQty))   || 0;
+              const rQty = Math.floor(Number(app.custom.receiveQty)) || 0;
+              if (oQty > 0 && rQty > 0) {
+                const oLabel = ASSETS[app.custom.offerAssetKey]?.label || 'offer';
+                const aLabel = ASSETS[app.custom.askAssetKey]?.label   || 'ask';
+                priceInfoEl.textContent = `Rate: ${(rQty / oQty).toFixed(6)} ${aLabel} per ${oLabel}`;
+              } else {
+                priceInfoEl.textContent = '';
+              }
+            }
+          }
+        }
+
         // Connect widget
         const widget = $('connect-widget');
         const connectButton = $('connect-wallet-btn');
@@ -1108,8 +1169,9 @@
         const rows = orders.map((o, i) => {
           const offerLabel = o.offerId ? hexToAsciiOrHex(o.offerName) : 'ADA';
           const askLabel   = o.askId   ? hexToAsciiOrHex(o.askName)   : 'ADA';
+          const qty = o.offerQtyTotal || '?';
           return `<tr>
-            <td title="${o.offerId || 'lovelace'}.${o.offerName}">${offerLabel}</td>
+            <td title="${o.offerId || 'lovelace'}.${o.offerName}">${qty} ${offerLabel}</td>
             <td title="${o.askId || 'lovelace'}.${o.askName}">${askLabel}</td>
             <td>${o.priceNum}/${o.priceDen}</td>
             <td class="muted" title="${o.txHash}#${o.txIndex}">${o.txHash.slice(0,10)}&hellip;#${o.txIndex}</td>
@@ -1119,7 +1181,7 @@
             </td>
           </tr>`;
         }).join('');
-        tableWrap.innerHTML = `<table class="orders-table"><thead><tr><th>Offer</th><th>Ask</th><th>Price</th><th>UTxO</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+        tableWrap.innerHTML = `<table class="orders-table"><thead><tr><th>Offer (qty asset)</th><th>Ask</th><th>Price</th><th>UTxO</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
       },
 
       /**
@@ -1142,6 +1204,58 @@
             app.dirty = true;
           };
         }
+
+        // Initialize swap widget HTML (once, on boot)
+        const swWidget = $('open-order-widget');
+        if (swWidget && !swWidget.dataset.init) {
+          swWidget.dataset.init = '1';
+          const opts = ASSET_OPTIONS.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+          swWidget.innerHTML = `
+            <div class="swap-box">
+              <div class="swap-box__label">You offer</div>
+              <div class="swap-box__row">
+                <input id="sw-offer-qty" type="number" class="swap-amt" placeholder="0" min="1" step="1">
+                <select id="sw-offer-asset" class="asset-btn">${opts}</select>
+              </div>
+            </div>
+            <div class="swap-divider">
+              <button id="sw-flip-btn" class="btn swap-flip-btn" type="button">&#8645;</button>
+            </div>
+            <div class="swap-box">
+              <div class="swap-box__label">You receive <span class="muted">(minimum)</span></div>
+              <div class="swap-box__row">
+                <input id="sw-receive-qty" type="number" class="swap-amt" placeholder="0" min="1" step="1">
+                <select id="sw-ask-asset" class="asset-btn">${opts}</select>
+              </div>
+              <div id="sw-price-info" class="swap-price-info"></div>
+            </div>
+            <div class="swap-extra">
+              <div class="field">
+                <label for="sw-expiry">Expiration <span class="muted">(minutes, 0 = none)</span></label>
+                <input id="sw-expiry" type="number" class="control" value="0" min="0" step="1">
+              </div>
+            </div>`;
+          $('sw-offer-qty').oninput    = e => { app.custom.offerQty      = e.target.value;             app.dirty = true; };
+          $('sw-receive-qty').oninput  = e => { app.custom.receiveQty    = e.target.value;             app.dirty = true; };
+          $('sw-offer-asset').onchange = e => { app.custom.offerAssetKey = e.target.value;             app.dirty = true; };
+          $('sw-ask-asset').onchange   = e => { app.custom.askAssetKey   = e.target.value;             app.dirty = true; };
+          $('sw-expiry').oninput       = e => { app.custom.expiryMins    = parseInt(e.target.value)||0; app.dirty = true; };
+          $('sw-flip-btn').onclick     = () => {
+            [app.custom.offerAssetKey, app.custom.askAssetKey] = [app.custom.askAssetKey, app.custom.offerAssetKey];
+            [app.custom.offerQty,      app.custom.receiveQty]  = [app.custom.receiveQty,  app.custom.offerQty];
+            app.dirty = true;
+          };
+        }
+
+        // Fetch current preprod slot for expiration (best-effort)
+        (async () => {
+          const apiKey = app.options.blockfrostApiKey;
+          if (!apiKey) return;
+          try {
+            const r = await fetch('https://cardano-preprod.blockfrost.io/api/v0/blocks/latest', { headers: { 'project_id': apiKey } });
+            if (r.ok) { const b = await r.json(); if (b.slot) app.custom.currentSlot = b.slot; }
+          } catch (_) {}
+        })();
 
         // Query open orders
         const queryBtn = $('query-orders-btn');
@@ -1183,23 +1297,29 @@
             if (action === 'fill') {
               app.ui.currentIntentKey = 'swapLimitOrder';
               const a = app.intents.swapLimitOrder.code.args;
-              a['swap-tx-hash']      = order.txHash;
-              a['swap-tx-index']     = String(order.txIndex);
-              a['offer-policy-id']   = order.offerId;
-              a['offer-asset-name']  = order.offerName;
-              a['ask-policy-id']     = order.askId;
-              a['ask-asset-name']    = order.askName;
-              a['price-numerator']   = String(order.priceNum);
-              a['price-denominator'] = String(order.priceDen);
+              a['swap-tx-hash']             = order.txHash;
+              a['swap-tx-index']            = String(order.txIndex);
+              a['owner-stake-keyhash']      = order.ownerStakeKeyHash || '';
+              a['offer-policy-id']          = order.offerId;
+              a['offer-asset-name']         = order.offerName;
+              a['ask-policy-id']            = order.askId;
+              a['ask-asset-name']           = order.askName;
+              a['price-numerator']          = String(order.priceNum);
+              a['price-denominator']        = String(order.priceDen);
+              // Full fill by default: take all offer, nothing remains
+              a['remaining-offer-quantity'] = '0';
+              // Min-ADA for the remaining output UTxO (holds beacons + remaining tokens)
+              a['output-ada-quantity']      = '2000000';
             } else if (action === 'close') {
               app.ui.currentIntentKey = 'closeLimitOrder';
               const a = app.intents.closeLimitOrder.code.args;
-              a['swap-tx-hash']        = order.txHash;
-              a['swap-tx-index']       = String(order.txIndex);
-              a['offer-policy-id']     = order.offerId;
-              a['offer-asset-name']    = order.offerName;
-              a['ask-policy-id']       = order.askId;
-              a['ask-asset-name']      = order.askName;
+              a['swap-tx-hash']          = order.txHash;
+              a['swap-tx-index']         = String(order.txIndex);
+              a['owner-stake-key-hash']  = order.ownerStakeKeyHash || '';
+              a['offer-policy-id']       = order.offerId;
+              a['offer-asset-name']      = order.offerName;
+              a['ask-policy-id']         = order.askId;
+              a['ask-asset-name']        = order.askName;
             }
             app.dirty = true;
           };
@@ -1212,6 +1332,43 @@
    * Exposes the global reactive app proxy for direct customization.
    */
   window.app = app;
+
+  /** Known asset catalog for the Open Limit Order picker. */
+  const ASSETS = {
+    ada:     { label: 'tADA', policyId: '',                                                         assetNameHex: '' },
+    fakeUSD: { label: 'FAKE', policyId: '044f78848ab25cbe7a84c0c6768d7fb98d7a99cad21e6f8298354923', assetNameHex: '46616b65555344' },
+    usdm:    { label: 'USDM', policyId: 'd4fece6b39f7cd78a3f036b2ae6508c13524b863922da80f68dd9ab7', assetNameHex: '5553444d' },
+    gc:      { label: 'GC',   policyId: '044f78848ab25cbe7a84c0c6768d7fb98d7a99cad21e6f8298354923', assetNameHex: '47616d654368616e676572546f6b656ef09f9a80' },
+  };
+  const ASSET_OPTIONS = Object.entries(ASSETS).map(([v, a]) => ({ value: v, label: a.label }));
+
+  /** Euclidean GCD for price ratio simplification. */
+  function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { const t = b; b = a % b; a = t; } return a || 1; }
+
+  /**
+   * Extracts the 28-byte stake key hash (hex) from a Cardano bech32 base address.
+   * DApp addresses are base addresses: [1-byte header][28-byte payment][28-byte stake].
+   */
+  function stakeKeyHashFromAddress(addr) {
+    try {
+      const CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+      const sep = addr.lastIndexOf('1');
+      if (sep < 0) return '';
+      // Data part excludes 6-char checksum
+      const data5 = addr.slice(sep + 1, addr.length - 6).split('').map(c => CHARSET.indexOf(c));
+      if (data5.some(v => v < 0)) return '';
+      const bytes = [];
+      let buf = 0, bits = 0;
+      for (const d of data5) {
+        buf = (buf << 5) | d;
+        bits += 5;
+        if (bits >= 8) { bits -= 8; bytes.push((buf >> bits) & 0xff); }
+      }
+      // header(1) + payment(28) + stake(28) = 57 bytes minimum
+      if (bytes.length < 57) return '';
+      return bytes.slice(29, 57).map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (_) { return ''; }
+  }
 
   /** Decode a hex asset name: returns UTF-8 string if printable ASCII, else truncated hex. */
   function hexToAsciiOrHex(hex) {
@@ -1326,7 +1483,13 @@
         seen.add(key);
         const datum = parseSwapDatum(utxo.inline_datum);
         if (!datum) continue;
-        orders.push({ ...datum, txHash: utxo.tx_hash, txIndex: utxo.tx_index, address });
+        // Extract total offer quantity from UTxO amount
+        const offerUnit = datum.offerId ? (datum.offerId + datum.offerName) : 'lovelace';
+        const offerEntry = utxo.amount && utxo.amount.find(a => a.unit === offerUnit);
+        const offerQtyTotal = offerEntry ? offerEntry.quantity : '0';
+        // Extract stake key hash from the DApp address (bytes 29-56 of decoded address)
+        const ownerStakeKeyHash = stakeKeyHashFromAddress(address);
+        orders.push({ ...datum, txHash: utxo.tx_hash, txIndex: utxo.tx_index, address, offerQtyTotal, ownerStakeKeyHash });
       }
     }
     return orders;
