@@ -11,6 +11,7 @@ This application supports the following operations on One-Way Swaps (Limit Order
 * **Create** — open a limit order specifying: offer asset, ask asset, price (as a ratio), and change address (where leftover ADA is returned).
 * **Query** — fetch open limit orders by beacon policy ID and filter by asset pair.
 * **Execute** — fill a limit order by depositing the ask asset and receiving the offer asset.
+* **Close** — cancel an existing limit order, burn all 3 beacons, and reclaim remaining offer asset and accumulated ask asset.
 
 ### Out of Scope
 
@@ -43,7 +44,8 @@ Rules the application must never violate. Protocol invariants are enforced by th
 
 ### Future Options
 
-* **Close/Cancel swap** — closing an existing limit order (burning beacons, reclaiming assets) is not in scope for this prototype but is a natural next operation to implement.
+* **ADA-as-offer variant** — the current implementation uses native token as offer and ADA as ask. An ADA-as-offer script variant is deferred due to minimum UTxO ADA bump complexity on execution.
+* **Repricing** — updating an existing swap's price via the `UpdateSwaps` redeemer.
 
 ### Application Flow
 
@@ -432,7 +434,7 @@ No conditionals or loops in ISL — but hashing, address derivation, datum const
 
 #### Capabilities Relevant to This Application
 
-- **Hashing**: SHA256/SHA512 available in ISL but only accepts UTF-8 strings, not raw bytes — beacon names require hashing raw byte arrays so they must be pre-computed externally and injected via `args`
+- **Hashing**: SHA256/SHA512 available in ISL. Accepts both UTF-8 strings and byte arrays — use `hexToByteArray()` to convert hex strings to bytes and `flatten()` to concatenate them before hashing. Beacon names are computed entirely inside GCscript with no external pre-computation needed.
 - **Address derivation**: `buildAddress` + staking credential functions can derive the personal DApp address internally; addresses can also be converted to Plutus data directly
 - **UTxO queries by policy ID**: chain query functions support querying by beacon policy ID; filtering may be handled within GCscript as well
 - **Plutus data serialization**: datum construction can be done inside the script
