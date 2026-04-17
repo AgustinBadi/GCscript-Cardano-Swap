@@ -12,13 +12,13 @@ All values are direct user input. Nothing needs to be pre-computed — beacon ha
 
 | Arg | Source |
 |---|---|
-| `offerPolicyId` | asset picker |
-| `offerAssetName` | asset picker (hex-encoded) |
-| `askPolicyId` | asset picker |
-| `askAssetName` | asset picker (hex-encoded) |
-| `priceNumerator` | user input |
-| `priceDenominator` | user input |
-| `offerQuantity` | user input |
+| `offer-policy-id` | asset picker |
+| `offer-asset-name` | asset picker (hex-encoded) |
+| `ask-policy-id` | asset picker |
+| `ask-asset-name` | asset picker (hex-encoded) |
+| `price-numerator` | user input |
+| `price-denominator` | user input |
+| `offer-quantity` | user input |
 
 ---
 
@@ -28,17 +28,17 @@ Two values require off-chain computation. Everything else is read from the selec
 
 | Arg | Source |
 |---|---|
-| `swapTxHash` | query UTxOs by pair beacon |
-| `swapTxIndex` | query UTxOs by pair beacon |
-| `ownerStakeKeyHash` | decoded from inline datum |
-| `offerPolicyId` | decoded from inline datum |
-| `offerAssetName` | decoded from inline datum |
-| `askPolicyId` | decoded from inline datum |
-| `askAssetName` | decoded from inline datum |
-| `priceNumerator` | decoded from inline datum |
-| `priceDenominator` | decoded from inline datum |
-| `remainingOfferQuantity` | **computed**: `current_offer - offer_taken` |
-| `outputAdaQuantity` | **computed**: `utxo_lovelace + (offer_taken × priceNumerator / priceDenominator)` |
+| `swap-tx-hash` | query UTxOs by pair beacon |
+| `swap-tx-index` | query UTxOs by pair beacon |
+| `owner-stake-keyhash` | decoded from inline datum |
+| `offer-policy-id` | decoded from inline datum |
+| `offer-asset-name` | decoded from inline datum |
+| `ask-policy-id` | decoded from inline datum |
+| `ask-asset-name` | decoded from inline datum |
+| `price-numerator` | decoded from inline datum |
+| `price-denominator` | decoded from inline datum |
+| `remaining-offer-quantity` | **computed**: `current_offer - offer_taken` |
+| `output-ada-quantity` | **computed**: `utxo_lovelace + floor(offer_taken × price-numerator / price-denominator)` |
 
 ---
 
@@ -48,13 +48,13 @@ All values come from the selected UTxO and its inline datum.
 
 | Arg | Source |
 |---|---|
-| `swapTxHash` | query user's own swap UTxOs |
-| `swapTxIndex` | query user's own swap UTxOs |
-| `ownerStakeKeyHash` | wallet (raw 28-byte key hash hex, not bech32) |
-| `offerPolicyId` | decoded from inline datum |
-| `offerAssetName` | decoded from inline datum |
-| `askPolicyId` | decoded from inline datum |
-| `askAssetName` | decoded from inline datum |
+| `swap-tx-hash` | query user's own swap UTxOs |
+| `swap-tx-index` | query user's own swap UTxOs |
+| `owner-stake-key-hash` | wallet (raw 28-byte key hash hex, not bech32) |
+| `offer-policy-id` | decoded from inline datum |
+| `offer-asset-name` | decoded from inline datum |
+| `ask-policy-id` | decoded from inline datum |
+| `ask-asset-name` | decoded from inline datum |
 
 ---
 
@@ -99,8 +99,8 @@ Use a CBOR library (`cbor-x`, `@emurgo/cardano-serialization-lib`, or similar) t
 Given a user-chosen `offer_taken` amount:
 
 ```
-remainingOfferQuantity = current_offer_quantity - offer_taken
-outputAdaQuantity      = utxo_lovelace + floor(offer_taken × priceNumerator / priceDenominator)
+remaining-offer-quantity = current_offer_quantity - offer_taken
+output-ada-quantity      = utxo_lovelace + floor(offer_taken × price-numerator / price-denominator)
 ```
 
 `utxo_lovelace` is the current ADA in the swap UTxO, read from the UTxO query response.

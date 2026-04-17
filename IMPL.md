@@ -75,3 +75,6 @@ Cancel an existing open limit order and reclaim assets.
 - ~~**Beacon names pre-computed externally**~~: **Resolved.** ISL `sha256(flatten(hexToByteArray(...), ...))` handles raw byte hashing inside the script.
 - ~~**Execute datum requires dynamic `prev_input`**~~: **Resolved.** Constructed inside GCscript from `args.swapTxHash` and `args.swapTxIndex` using nested `plutusData` constructors.
 - ~~**ADA-as-offer edge case**~~: **Avoided.** Switched to GCT-offer / ADA-ask pair. ADA-as-offer is deferred to a future script variant.
+- **Deployment constants hardcoded in scripts**: The beacon policy ID and spending validator hash are currently hardcoded strings in all three scripts. They should be moved to `args` so the frontend controls them and a network/deployment change only requires updating one place.
+  - `beacon-policy-id`: `c4d7d117d9ebcde6db28db40837ff2b1401e9eaaa6eecea9e070e209`
+  - `spending-validator-hash`: `1d6cff26bcab91d2061aad0bd259cbb7d76d25ced2eeaed5926a42ad`

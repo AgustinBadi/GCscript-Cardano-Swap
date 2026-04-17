@@ -110,6 +110,7 @@
                 "outputs": [
                     {
                         "address": "{get('cache.dependencies.dappAddress')}",
+                        "idPattern": "swap-output",
                         "datum": {
                             "datumHex": "{get('cache.dependencies.outputDatum.dataHex')}"
                         },
@@ -177,8 +178,23 @@
         },
         "submit": {
             "type": "submitTxs",
+            "mode": "noWait",
             "namePattern": "submitted-swap",
             "txs": "{get('cache.sign')}"
-        }
+        },
+        "finally": {
+            "type": "macro",
+            "run": {                                
+                "txHash": "{get('cache.build.txHash')}",
+                "index": "{get('cache.build.indexMap.output.swap-output')}",
+                "pairBeacon": "{get('cache.dependencies.pairBeacon')}",
+                "offerPolicyId": "{get('args.offer-policy-id')}",
+                "offerAssetName": "{get('args.offer-asset-name')}",
+                "offerBeacon": "{get('cache.dependencies.offerBeacon')}",
+                "askPolicyId": "{get('args.ask-policy-id')}",
+                "askAssetName": "{get('args.ask-asset-name')}",
+                "askBeacon": "{get('cache.dependencies.askBeacon')}"                    
+            }
+        }        
     }
 }
