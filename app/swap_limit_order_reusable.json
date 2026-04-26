@@ -1,25 +1,28 @@
 {
     "type": "script",
-    "title": "Open Limit Order",
-    "description": "Opens a one-way swap offer on P2P DeFi Kernel using GCScript DSL intents",
-    "exportAs": "openLimitOrder",
+    "title": "Swap Limit Order",
+    "description": "Fills an existing one-way swap offer on P2P DeFi Kernel using GCScript DSL intents. Deposits the ask asset and receives the offer asset. UTXO is automatically queried on DSL runtime.",
+    "exportAs": "swapLimitOrder",
     "return":{
         "mode":"last"
-    },    
+    },
     "args": {
-        "offer-policy-id": "ada",
-        "offer-asset-name": "ada",
-        "offer-quantity": "3000000",
-        "ask-policy-id": "d4fece6b39f7cd78a3f036b2ae6508c13524b863922da80f68dd9ab7",
-        "ask-asset-name": "5553444d",
-        "price-numerator": "1",
-        "price-denominator": "3"
+        "owner-stake-keyhash": "f3eb9839fb3be3e66b330bc9d3213d498c3d61a1fe4b33699f04dce5",        
+        "ask-policy-id": "ada",
+        "ask-asset-name": "ada",
+        "ask-quantity": "1500000",        
+        "offer-policy-id": "d4fece6b39f7cd78a3f036b2ae6508c13524b863922da80f68dd9ab7",
+        "offer-asset-name": "5553444d",
+        "offer-quantity": "500000",
+        "price-numerator": "3",
+        "price-denominator": "1"
     },
     "run": {
         "dependencies": {
             "type": "script",
             "args": "{get('args')}",
             "run": {
+
                 "transform": {
                     "type": "macro",
                     "run": {
@@ -85,9 +88,33 @@
                             "offer-asset-name"  : "{get('args.offer-asset-name')}",
                             "ask-policy-id"     : "{get('args.ask-policy-id')}",
                             "ask-asset-name"    : "{get('args.ask-asset-name')}"
-                        }  
+                        },
+                        "quantity":{
+                            "ask"   :{
+                                "ada-ada":"0",
+                                "{join('-', get('args.ask-policy-id'), get('args.ask-asset-name'))}":"{get('args.ask-quantity')}"
+                            },
+                            "offer" :{
+                                "ada-ada":"0",
+                                "{join('-', get('args.offer-policy-id'), get('args.offer-asset-name'))}":"{get('args.offer-quantity')}"
+                            }
+                        } 
                     }                   
                 },
+                "pairBeacon": {
+                    "type": "macro",
+                    "run": "{sha256(flatten(hexToByteArray(get('cache.dependencies.normalized.forPairBeaconHashing.offer-policy-id')), hexToByteArray(get('cache.dependencies.normalized.forPairBeaconHashing.offer-asset-name')),  hexToByteArray(get('cache.dependencies.normalized.forPairBeaconHashing.ask-policy-id')), hexToByteArray(get('cache.dependencies.normalized.forPairBeaconHashing.ask-asset-name'))))}"
+                },
+                "offerBeacon": {
+                    "type": "macro",
+                    "run": "{sha256(flatten(hexToByteArray(get('cache.dependencies.normalized.forOfferBeaconHashing.prefix')), hexToByteArray(get('cache.dependencies.normalized.forOfferBeaconHashing.offer-policy-id')), hexToByteArray(get('cache.dependencies.normalized.forOfferBeaconHashing.offer-asset-name'))))}"
+                },
+                "askBeacon": {
+                    "type": "macro",
+                    "run": "{sha256(flatten(hexToByteArray(get('cache.dependencies.normalized.forAskBeaconHashing.prefix')), hexToByteArray(get('cache.dependencies.normalized.forAskBeaconHashing.ask-policy-id')), hexToByteArray(get('cache.dependencies.normalized.forAskBeaconHashing.ask-asset-name'))))}"
+                },
+
+
                 "beaconPolicy": {
                     "type": "plutusScript",
                     "script": {
@@ -102,34 +129,40 @@
                         "lang": "plutus_v2"
                     }
                 },
-                "stakingKey": {
-                    "type": "getStakingPublicKey"
+                "dappAddress": {
+                    "type": "buildAddress",
+                    "name": "DAppAddress",
+                    "addr": {
+                        "spendScriptHashHex": "{get('cache.dependencies.spendingValidator.scriptHashHex')}",
+                        "stakePubKeyHashHex": "{get('args.owner-stake-keyhash')}"
+                    }
                 },
-                "beaconRedeemer": {
+                "currentOfferQuery": {
+                    "type": "query",
+                    "get": {
+                        "kind": "BeaconToken",
+                        "asset": {
+                            "policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}",
+                            "assetNameHex": "{get('cache.dependencies.offerBeacon')}"
+                        },
+                        "address": "{get('cache.dependencies.dappAddress')}"
+                    }
+                },
+
+
+                "swapRedeemer": {
                     "type": "plutusData",
                     "data": {
                         "fromJSON": {
                             "schema": 1,
                             "obj": {
-                                "constructor": 1,
+                                "constructor": 2,
                                 "fields": []
                             }
                         }
                     }
                 },
-                "pairBeacon": {
-                    "type": "macro",
-                    "run": "{sha256(flatten(hexToByteArray(get('cache.dependencies.normalized.forPairBeaconHashing.offer-policy-id')), hexToByteArray(get('cache.dependencies.normalized.forPairBeaconHashing.offer-asset-name')),  hexToByteArray(get('cache.dependencies.normalized.forPairBeaconHashing.ask-policy-id')), hexToByteArray(get('cache.dependencies.normalized.forPairBeaconHashing.ask-asset-name'))))}"
-                },
-                "offerBeacon": {
-                    "type": "macro",
-                    "run": "{sha256(flatten(hexToByteArray(get('cache.dependencies.normalized.forOfferBeaconHashing.prefix')), hexToByteArray(get('cache.dependencies.normalized.forOfferBeaconHashing.offer-policy-id')), hexToByteArray(get('cache.dependencies.normalized.forOfferBeaconHashing.offer-asset-name'))))}"
-                },
-                "askBeacon": {
-                    "type": "macro",
-                    "run": "{sha256(flatten(hexToByteArray(get('cache.dependencies.normalized.forAskBeaconHashing.prefix')), hexToByteArray(get('cache.dependencies.normalized.forAskBeaconHashing.ask-policy-id')), hexToByteArray(get('cache.dependencies.normalized.forAskBeaconHashing.ask-asset-name'))))}"
-                },
-                "swapDatum": {
+                "outputDatum": {
                     "type": "plutusData",
                     "data": {
                         "fromJSON": {
@@ -149,49 +182,78 @@
                                         {"int": "{jsonToObj(get('args.price-numerator'))}"},
                                         {"int": "{jsonToObj(get('args.price-denominator'))}"}
                                     ]},
-                                    {"constructor": 1, "fields": []},
+                                    {"constructor": 0, "fields": [
+                                        {"constructor": 0, "fields": [
+                                            {"constructor": 0, "fields": [
+                                                {"bytes": "{get('cache.dependencies.currentOfferQuery.txHash')}"}
+                                            ]},
+                                            {"int": "{jsonToObj(get('cache.dependencies.currentOfferQuery.index'))}"}
+                                        ]}
+                                    ]},
                                     {"constructor": 1, "fields": []}
                                 ]
                             }
                         }
                     }
                 },
-                "dappAddress": {
-                    "type": "buildAddress",
-                    "name": "DAppAddress",
-                    "addr": {
-                        "spendScriptHashHex": "{get('cache.dependencies.spendingValidator.scriptHashHex')}",
-                        "stakePubKeyHashHex": "{get('cache.dependencies.stakingKey.pubKeyHashHex')}"
-                    }
+                "myAddress": {
+                    "type": "getCurrentAddress"
+                },
+                "currentADA": {
+                    "type": "macro",
+                    "run": "{get('cache.dependencies.currentOfferQuery.assets.ada-ada.quantity')}"
+                },                
+                "currentOffer": {
+                    "type": "macro",
+                    "run": "{get(join('.','cache','dependencies','currentOfferQuery','assets',   join('-',get('cache.dependencies.normalized.forTx.offer-policy-id'),get('cache.dependencies.normalized.forTx.offer-asset-name'))     ,'quantity'))}"
+                },
+                "remainingADA": {
+                    "type": "macro",
+                    "run": "{addBigNum(get('cache.dependencies.currentADA'), get('cache.dependencies.normalized.quantity.ask.ada-ada') )}"
+                },             
+                "remainingOffer": {
+                    "type": "macro",
+                    "run": "{subBigNum(get('cache.dependencies.currentOffer'), get('args.offer-quantity') )}"
                 }
             }
         },
         "txTemplate": {
             "type": "macro",
             "run": {
-                "mints": [
+                "inputs": [
                     {
-                        "policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}",
-                        "idPattern": "beaconMint",
-                        "assets": [
-                            {"assetNameHex": "{get('cache.dependencies.pairBeacon')}", "quantity": "1"},
-                            {"assetNameHex": "{get('cache.dependencies.offerBeacon')}", "quantity": "1"},
-                            {"assetNameHex": "{get('cache.dependencies.askBeacon')}", "quantity": "1"}
-                        ]
+                        "txHash": "{get('cache.dependencies.currentOfferQuery.txHash')}",
+                        "index": "{jsonToObj(get('cache.dependencies.currentOfferQuery.index'))}",
+                        "idPattern": "swap-input"
                     }
                 ],
                 "outputs": [
                     {
-                        "idPattern": "swap-output",                        
-                        "address": "{get('cache.dependencies.dappAddress')}",
-                        "datum": {
-                            "datumHex": "{get('cache.dependencies.swapDatum.dataHex')}"
-                        },
+                        "address": "{get('cache.dependencies.myAddress')}",
                         "assets": [
                             {
                                 "policyId": "{get('cache.dependencies.normalized.forTx.offer-policy-id')}",
                                 "assetNameHex": "{get('cache.dependencies.normalized.forTx.offer-asset-name')}",
                                 "quantity": "{get('args.offer-quantity')}"
+                            }
+                        ]
+                    },
+                    {
+                        "address": "{get('cache.dependencies.dappAddress')}",
+                        "idPattern": "swap-output",
+                        "datum": {
+                            "datumHex": "{get('cache.dependencies.outputDatum.dataHex')}"
+                        },
+                        "assets": [
+                            {
+                                "policyId": "ada",
+                                "assetNameHex": "ada",
+                                "quantity": "{get('cache.dependencies.remainingADA')}"
+                            },
+                            {
+                                "policyId": "{get('cache.dependencies.normalized.forTx.offer-policy-id')}",
+                                "assetNameHex": "{get('cache.dependencies.normalized.forTx.offer-asset-name')}",
+                                "quantity": "{get('cache.dependencies.remainingOffer')}"
                             },
                             {
                                 "policyId": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}",
@@ -215,17 +277,17 @@
                     "plutus": {
                         "scripts": [
                             {
-                                "scriptHex": "{get('cache.dependencies.beaconPolicy.scriptHex')}",
-                                "lang": "{get('cache.dependencies.beaconPolicy.lang')}"
+                                "scriptHex": "{get('cache.dependencies.spendingValidator.scriptHex')}",
+                                "lang": "{get('cache.dependencies.spendingValidator.lang')}"
                             }
                         ],
                         "consumers": [
                             {
-                                "scriptHashHex": "{get('cache.dependencies.beaconPolicy.scriptHashHex')}",
+                                "scriptHashHex": "{get('cache.dependencies.spendingValidator.scriptHashHex')}",
                                 "redeemer": {
-                                    "dataHex": "{get('cache.dependencies.beaconRedeemer.dataHex')}",
-                                    "type": "mint",
-                                    "itemIdPattern": "beaconMint"
+                                    "dataHex": "{get('cache.dependencies.swapRedeemer.dataHex')}",
+                                    "type": "spend",
+                                    "itemIdPattern": "swap-input"
                                 }
                             }
                         ]
@@ -238,7 +300,7 @@
         },
         "build": {
             "type": "buildTx",
-            "title": "Open Limit Order",
+            "title": "Swap Limit Order",            
             "tx": "{get('cache.txTemplate')}"
         },
         "sign": {
@@ -266,6 +328,6 @@
                 "askAssetName": "{get('args.ask-asset-name')}",
                 "askBeacon": "{get('cache.dependencies.askBeacon')}"                    
             }
-        }         
+        }        
     }
 }
