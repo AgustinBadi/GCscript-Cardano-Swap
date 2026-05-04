@@ -3,10 +3,13 @@
     "title": "Close Limit Order",
     "description": "Closes a one-way swap UTxO on the Cardano-Swaps protocol. Burns all 3 beacons and returns remaining offer and accumulated ask assets to the owner. Staking credential must sign.",
     "exportAs": "closeLimitOrder",
+    "return":{
+        "mode":"last"
+    },    
     "args": {
-        "swap-tx-hash": "",
-        "swap-tx-index": "",
         "owner-stake-key-hash": "",
+        "utxo-tx-hash": "",
+        "utxo-tx-index": "",
         "offer-policy-id": "",
         "offer-asset-name": "",
         "ask-policy-id": "",
@@ -69,14 +72,13 @@
                 }
             }
         },
-        "build": {
-            "type": "buildTx",
-            "name": "built-close-swap",
-            "tx": {
+        "txTemplate": {
+            "type": "macro",
+            "run": {
                 "inputs": [
                     {
-                        "txHash": "{get('args.swap-tx-hash')}",
-                        "index": "{jsonToObj(get('args.swap-tx-index'))}",
+                        "txHash": "{get('args.utxo-tx-hash')}",
+                        "index": "{jsonToObj(get('args.utxo-tx-index'))}",
                         "idPattern": "swap-input"
                     }
                 ],
@@ -131,9 +133,13 @@
                 }
             }
         },
+        "build": {
+            "type": "buildTx",
+            "title": "Close Limit Order",            
+            "tx": "{get('cache.txTemplate')}"
+        },        
         "sign": {
             "type": "signTxs",
-            "namePattern": "signed-close-swap",
             "detailedPermissions": false,
             "txs": [
                 "{get('cache.build.txHex')}"
@@ -141,8 +147,21 @@
         },
         "submit": {
             "type": "submitTxs",
-            "namePattern": "submitted-close-swap",
             "txs": "{get('cache.sign')}"
-        }
+        },
+        "finally": {
+            "type": "macro",
+            "run": {                                
+                "txHash": "{get('args.utxo-tx-hash')}",
+                "index": "{get('args.utxo-tx-index')}",
+                "pairBeacon": "{get('cache.dependencies.pairBeacon')}",
+                "offerPolicyId": "{get('args.offer-policy-id')}",
+                "offerAssetName": "{get('args.offer-asset-name')}",
+                "offerBeacon": "{get('cache.dependencies.offerBeacon')}",
+                "askPolicyId": "{get('args.ask-policy-id')}",
+                "askAssetName": "{get('args.ask-asset-name')}",
+                "askBeacon": "{get('cache.dependencies.askBeacon')}"                    
+            }
+        }          
     }
 }
